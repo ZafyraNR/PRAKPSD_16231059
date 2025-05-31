@@ -1,24 +1,30 @@
 ---
-title: "Tugas 2 Praktikum PSD"
+title: "**Analisis Faktor yang Mempengaruhi Harga Rumah di Boston**"
 author: "Zafyra Nur Rizqi"
-date: "2025-05-31"
-output: pdf_document
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    fig_caption: true
+    df_print: tibble
+fontsize: 11pt
+geometry: margin=1in
 ---
 
-## Data
-
------------
+# Data
 
 ```{r load-packages, echo=FALSE, message=FALSE}
 suppressWarnings({
   library(MASS)
   library(ggplot2)
+  library(broom)
+  library(GGally)
   library(dplyr)
   library(psych)
   library(car)      
   library(lmtest)
-  library(broom)
-  library(GGally)
 })
 
 head(Boston) # menampilkan dataset Boston
@@ -33,36 +39,47 @@ cor(Boston[, c("medv", "lstat", "rm", "age", "crim")]) # korelasi
 ```
 
 Pengertian: 
-Saya memakai dataset Boston yang berasal dari package R yaitu MASS. Dataset ini berisi data properti di wilayah Boston. Beberapa variabel penting dalam dataset ini berupa medv (median harga rumah), lstat (persentase pennduduk dengan status sosial rendah), rm (rata-rata jumlah kamar/rumah), age (proporsi rumah tua), crim (tingkat kejahatan per kapita), dan indus (proporsi area bisnis non retail).
-Adapula package library yang saya gunakan guna menunjang analisis ini, yaitu berupa MASS (dataset Boston), ggplot2 (visualisasi), dplyr (manipulasi data), psych (statistik deskriptif), car (uji asumsi klasik), lmtest (uji homoskedastisitas).
 
------------
+Saya memakai dataset Boston yang berasal dari package R yaitu MASS. Dataset ini berisi data properti di wilayah Boston. Beberapa variabel penting dalam dataset ini berupa medv (median harga rumah), lstat (persentase pennduduk dengan status sosial rendah), rm (rata-rata jumlah kamar/rumah), age (proporsi rumah tua), crim (tingkat kejahatan per kapita), dan indus (proporsi area bisnis non retail).
+
+Adapula package library yang saya gunakan guna menunjang analisis ini, yaitu berupa MASS (dataset Boston), ggplot2 brom dan GGally (visualisasi), dplyr (manipulasi data), psych (statistik deskriptif), car (uji asumsi klasik), lmtest (uji homoskedastisitas).
+
+Hasil ringkasan statistik deskriptif menunjukkan harga rumah (medv) memiliki nilai rata-rata 22.53, dengan nilai minimum 5 dan maksimum 50, kriminalitas (crim) sangat bervariasi dari 0.00632 hingga 88.98, dan terdapat korelasi negatif kuat antara medv dan lstat (-0.738), serta korelasi positif antara medv dan rm (0.695), yang menandakan keduanya adalah prediktor penting untuk harga rumah.
 
 ## Model Regresi
 
 ```{r}
 model <- lm(medv ~ lstat + rm + age, data = Boston)
 summary(model)
+
+tidy(model, conf.int = TRUE)
 ```
 
-Pengertian: 
-Analisis ini saya buat untuk mengetahui faktor-faktor apa saja yang memengaruhi harga rumah (medv) di Boston maka dari itu digunakanlah regresi berganda untuk memodelkan hubungan antara harga rumah dan beberapa variabel prediktor, yaitu lstat, rm dan age sehingga dari hasil model regresi ini, dapat dilihat variabel mana yang paling berpengaruh, memprediksi harga rumah, dan menguji apakah model ini valid melalui uji asumsi klasik.
+Pengertian:
 
------------
+Analisis ini saya buat untuk mengetahui faktor-faktor apa saja yang memengaruhi harga rumah (medv) di Boston maka dari itu digunakanlah regresi berganda untuk memodelkan hubungan antara harga rumah dan beberapa variabel prediktor, yaitu lstat, rm dan age.
 
-## Uji Asumsi Klasik
-### a. Multikolineritas
+Hasil model regresi ini menunjukkan Intersep sebesar -1.175, tidak signifikan (p = 0.712), lstat mempunyai koefisien -0.669, sangat signifikan (p < 2e-16) yang berarti setiap kenaikan 1% populasi berstatus sosial rendah menurunkan harga rumah sekitar $669, rm mempunyai koefisien 5.02, sangat signifikan (p < 2e-16) yang berarti setiap tambahan satu kamar meningkatkan harga rumah sekitar $5,020, dan age mempunyai Koefisien 0.009 atau tidak signifikan (p = 0.418). 
+
+Hasil akhirnya adalah model ini menjelaskan 63.9% variasi harga rumah (R-squared = 0.639). Artinya, model ini cukup baik dalam menjelaskan hubungan antara variabel bebas dengan medv.
+
+# Uji Asumsi Klasik
+## Multikolineritas
 
 ```{r}
 vif(model)
 ```
 
 Pengertian:
-Menghitung Variance Inflation Factor. VIF > 10 artinya terjadi multikolinearitas. Jika semua < 10, aman.
 
-### b. Normalitas Residual
+Menghitung Variance Inflation Factor. VIF > 10 artinya terjadi multikolinearitas. Jika semua < 10, aman. 
+
+Dari hasil yang didapatkan, semua nilai VIF < 10 maka tidak ada masalah multikolineritas.
+
+## Normalitas Residual
 
 ```{r}
+res <- resid(model)
 ggplot(data = data.frame(residuals = res), aes(sample = residuals)) +
   stat_qq(color = "darkblue", size = 2, alpha = 0.7) +
   stat_qq_line(color = "red", linetype = "dashed") +
@@ -78,21 +95,25 @@ shapiro.test(resid(model))
 ```
 
 Pengertian: 
+
 Fungsi ini untuk mengetaui apakah residual berdistribusi normal, dibantu dengan visualisasi datanya. Dilakukan juga uji statistik Shapiro-Wilk, yang dimana jika hasil nilai p > 0.05 = data normal.
 
-### c. Homoskedastisitas
+Dari hasil yang didapatkan, W = 0.914 dan p-value = 2.385e-16 sehingga artinya, residual tidak berdistribusi normal, karena p < 0.05. Hal ini juga terlihat dari QQ Plot yang menyimpang dari garis lurus.
+
+## Homoskedastisitas
 
 ```{r}
 bptest(model)
 ```
 
 Pengertian:
+
 Dilakukan uji Breusch-Pagan yang dimana jika hasil p-value > 0.05 menunjukkan residual memiliki varians konstan (tidak heteroskedastis).
 
------------
+Dari hasil yang didapatkan, nilai BP = 19.77 dan p-value = 0.0001894 sehingga artinya terdapat indikasi heteroskedastisitas.
 
-## Visualisasi
-### a.Plot Prediksi vs Realisasi
+# Visualisasi
+## Plot Prediksi vs Realisasi
 
 ```{r}
 prediksi <- predict(model)
@@ -112,7 +133,11 @@ ggplot(data = Boston, aes(x = prediksi, y = medv)) +
 
 Pengertian:
 
-### b. Plot Residual vs Fitted
+Plot ini menunjukkan perbandingan antara harga rumah hasil prediksi dan harga sebenarnya. Garis diagonal (hitam) menunjukkan jika prediksi sempurna. Titik-titik yang jauh dari garis menunjukkan error prediksi. Semakin merah warnanya, semakin besar errornya.
+
+Model terlihat mampu menangkap pola umum, namun terdapat beberapa deviasi (error) besar.
+
+## Plot Residual vs Fitted
 ```{r}
 residuals <- resid(model)
 fitted <- fitted(model)
@@ -131,7 +156,9 @@ ggplot(data = NULL, aes(x = fitted, y = residuals)) +
 
 Pengertian: 
 
-### c. Plot Koefisien Model
+Plot ini digunakan untuk melihat pola pada residual. Hasil menunjukkan pola menyebar tidak merata dan menyimpang dari garis horizontal (0), yang memperkuat adanya heteroskedastisitas. Idealnya, titik-titik menyebar secara acak di sekitar nol.
+
+## Plot Koefisien Model
 ```{r}
 tidy(model) %>%
   filter(term != "(Intercept)") %>%
@@ -141,3 +168,7 @@ tidy(model) %>%
   labs(title = "Koefisien Model Regresi", x = "Variabel", y = "Estimasi Koefisien") +
   theme_minimal()
 ```
+
+Pengertian:
+
+Visualisasi ini menunjukkan nilai koefisien dari masing-masing prediktor. Dapat dilihat bahwa rm memiliki pengaruh positif dan paling besar, lstat berpengaruh negatif dan age memiliki pengaruh sangat kecil, mendekati nol.
