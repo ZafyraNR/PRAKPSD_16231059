@@ -5,26 +5,139 @@ date: "2025-05-31"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+## Data
+
+-----------
+
+```{r load-packages, echo=FALSE, message=FALSE}
+suppressWarnings({
+  library(MASS)
+  library(ggplot2)
+  library(dplyr)
+  library(psych)
+  library(car)      
+  library(lmtest)
+  library(broom)
+  library(GGally)
+})
+
+head(Boston) # menampilkan dataset Boston
+
+summary(Boston) # ringkasan statistik deskriptif
+
+Boston %>%
+  select(medv, lstat, rm, age, crim) %>%
+  ggpairs(title = "Korelasi Antar Variabel Penting")
+
+cor(Boston[, c("medv", "lstat", "rm", "age", "crim")]) # korelasi
 ```
 
-## R Markdown
+Pengertian: 
+Saya memakai dataset Boston yang berasal dari package R yaitu MASS. Dataset ini berisi data properti di wilayah Boston. Beberapa variabel penting dalam dataset ini berupa medv (median harga rumah), lstat (persentase pennduduk dengan status sosial rendah), rm (rata-rata jumlah kamar/rumah), age (proporsi rumah tua), crim (tingkat kejahatan per kapita), dan indus (proporsi area bisnis non retail).
+Adapula package library yang saya gunakan guna menunjang analisis ini, yaitu berupa MASS (dataset Boston), ggplot2 (visualisasi), dplyr (manipulasi data), psych (statistik deskriptif), car (uji asumsi klasik), lmtest (uji homoskedastisitas).
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+-----------
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Model Regresi
 
-```{r cars}
-summary(cars)
+```{r}
+model <- lm(medv ~ lstat + rm + age, data = Boston)
+summary(model)
 ```
 
-## Including Plots
+Pengertian: 
+Analisis ini saya buat untuk mengetahui faktor-faktor apa saja yang memengaruhi harga rumah (medv) di Boston maka dari itu digunakanlah regresi berganda untuk memodelkan hubungan antara harga rumah dan beberapa variabel prediktor, yaitu lstat, rm dan age sehingga dari hasil model regresi ini, dapat dilihat variabel mana yang paling berpengaruh, memprediksi harga rumah, dan menguji apakah model ini valid melalui uji asumsi klasik.
 
-You can also embed plots, for example:
+-----------
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+## Uji Asumsi Klasik
+### a. Multikolineritas
+
+```{r}
+vif(model)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Pengertian:
+Menghitung Variance Inflation Factor. VIF > 10 artinya terjadi multikolinearitas. Jika semua < 10, aman.
+
+### b. Normalitas Residual
+
+```{r}
+ggplot(data = data.frame(residuals = res), aes(sample = residuals)) +
+  stat_qq(color = "darkblue", size = 2, alpha = 0.7) +
+  stat_qq_line(color = "red", linetype = "dashed") +
+  labs(
+    title = "QQ Plot Residual",
+    subtitle = "Memeriksa Normalitas Residual",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  ) +
+  theme_minimal()
+
+shapiro.test(resid(model))
+```
+
+Pengertian: 
+Fungsi ini untuk mengetaui apakah residual berdistribusi normal, dibantu dengan visualisasi datanya. Dilakukan juga uji statistik Shapiro-Wilk, yang dimana jika hasil nilai p > 0.05 = data normal.
+
+### c. Homoskedastisitas
+
+```{r}
+bptest(model)
+```
+
+Pengertian:
+Dilakukan uji Breusch-Pagan yang dimana jika hasil p-value > 0.05 menunjukkan residual memiliki varians konstan (tidak heteroskedastis).
+
+-----------
+
+## Visualisasi
+### a.Plot Prediksi vs Realisasi
+
+```{r}
+prediksi <- predict(model)
+ggplot(data = Boston, aes(x = prediksi, y = medv)) +
+  geom_point(aes(color = abs(prediksi - medv)), size = 2.5) +
+  scale_color_gradient(low = "green", high = "red") +
+  geom_smooth(method = "lm", se = FALSE, color = "darkblue") +
+  geom_abline(slope = 1, intercept = 0, color = "black", linetype = "dashed") +
+  labs(
+    title = "Perbandingan Prediksi vs Harga Rumah Sebenarnya",
+    x = "Harga Prediksi",
+    y = "Harga Sebenarnya (medv)",
+    color = "Error"
+  ) +
+  theme_minimal()
+```
+
+Pengertian:
+
+### b. Plot Residual vs Fitted
+```{r}
+residuals <- resid(model)
+fitted <- fitted(model)
+
+ggplot(data = NULL, aes(x = fitted, y = residuals)) +
+  geom_point(color = "darkorange", alpha = 0.7, size = 2) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  labs(
+    title = "Plot Residual vs Nilai Prediksi",
+    x = "Nilai Fitted (Prediksi)",
+    y = "Residual"
+  ) +
+  theme_light()
+```
+
+Pengertian: 
+
+### c. Plot Koefisien Model
+```{r}
+tidy(model) %>%
+  filter(term != "(Intercept)") %>%
+  ggplot(aes(x = reorder(term, estimate), y = estimate)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Koefisien Model Regresi", x = "Variabel", y = "Estimasi Koefisien") +
+  theme_minimal()
+```
